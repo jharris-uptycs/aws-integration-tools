@@ -5,6 +5,12 @@ wish to control the
 
 # Setup Procedure
 
+## Clone the repository to you local system
+
+
+```git clone https://github.com/jharris-uptycs/aws-integration-tools.git```
+
+
 ## 1) Setup CloudTrail in the Master account
 
 Uptycs requires access to CloudTrail logs from each of your accounts to monitor for suspicious 
