@@ -1,4 +1,16 @@
-# Organization Setup
+<!-- TOC -->
+* [Organization Setup](#organization-setup)
+* [Setup Procedure](#setup-procedure)
+  * [Clone the repository to you local system](#clone-the-repository-to-you-local-system)
+  * [1) Setup CloudTrail in the Master account](#1--setup-cloudtrail-in-the-master-account)
+  * [2) Load the CloudFormation template "org-setup.yaml"](#2--load-the-cloudformation-template--org-setupyaml-)
+    * [Load the cloudformation template.](#load-the-cloudformation-template)
+    * [Accept default settings on the following pages and acknowlege](#accept-default-settings-on-the-following-pages-and-acknowlege)
+    * [Verify that the stack completes](#verify-that-the-stack-completes)
+    * [Apply Stack Instances to Accounts](#apply-stack-instances-to-accounts)
+  * [3) Register the Org in the Uptycs Console](#3--register-the-org-in-the-uptycs-console)
+* [Creating a new Trail](#creating-a-new-trail)
+<!-- TOC --># Organization Setup
 
 This document describes how to setup your Uptycs Integration in an AWS organization where you 
 wish to control the 
@@ -32,7 +44,7 @@ Note these values as you will need them as parameters for the cloudformation tem
 * KMS Encryption
 
 If you do not have a suitable trail in the master account then create a trail following the 
-procedure Creating a new Trail
+procedure [Creating a new Trail](#creating-a-new-trail)
 
 ## 2) Load the CloudFormation template "org-setup.yaml"
 
@@ -61,6 +73,10 @@ If you use permissions boundarys enter the policy name otherwise leave blank
 ### Apply Stack Instances to Accounts
 
 Navigate to **Cloudformation -> Stacksets**
+
+<img src='../images/stackset-1.png' width='600'>
+
+<img src='../images/stackset-2.png' width='600'>
 
 * Select **Add stacks to StackSet**
 * Select **Add to OU or Org**
