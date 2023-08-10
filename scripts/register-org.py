@@ -4,8 +4,10 @@
 # been created manually
 #
 # Usage: register-org.py --action xx --config xxx --rolename xxx --externalid xx --ctbucket xx
-# --ctaccount xx --ctregion xx
+# --ctaccount xx --ctregion xx --masteraccount xxx
 #
+# Specify master account ID if not running inside Cloudshell in master or not using master account
+# cli profile
 #
 import json
 import boto3
@@ -162,7 +164,7 @@ def get_uptycs_internal_id(url, req_header, account_id):
 def account_registration_handler(args):
     with open(args.config) as api_config_file:
         uptycs_api_params = json.load(api_config_file)
-    account_id = get_master_account()
+    account_id = get_master_account() if args.masteraccount is None else args.masteraccount
     domain = uptycs_api_params.get('domain')
     domainSuffix = uptycs_api_params.get('domainSuffix')
     customer_id = uptycs_api_params.get('customerId')
@@ -202,7 +204,7 @@ def account_registration_handler(args):
             # Handle delete event
     elif args.action == "Delete":
         try:
-            account_id = get_master_account()
+            account_id = get_master_account() if not args.masteraccount else args.masteraccount
             uptycs_account_id = get_uptycs_internal_id(uptycs_api_url, req_header,
                                                        account_id)
             if uptycs_account_id:
@@ -242,6 +244,8 @@ if __name__ == '__main__':
                         help='REQUIRED: The Name of the CloudTrail bucket region')
     parser.add_argument('--ctprefix',
                         help='OPTIONAL: The Name of the CloudTrail log prefix')
+    parser.add_argument('--masteraccount',
+                        help='OPTIONAL: The Master account ID (12 digits)')
 
     # Parse the arguments
     args = parser.parse_args()
