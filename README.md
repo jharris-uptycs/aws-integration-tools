@@ -80,6 +80,9 @@ to be monitored and to cloudtrail logs in a **dedicated** cloudtrail logging acc
 expected that each member account will have a individual cloudtrail writing to the consolidated 
 logging account or an organization wide trail writing to a logging account. 
 
+<img src='./images/aws-org-acct-flow.png' width='600'>
+
+
 <img src='./images/aws-org-acct.png' width='600'>
 
 ### Master Account

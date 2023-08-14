@@ -10,6 +10,7 @@
 # cli profile
 #
 import json
+import uuid
 import boto3
 import logging
 import os
@@ -30,7 +31,14 @@ LOGLEVEL = os.environ.get('LOGLEVEL', logging.INFO)
 logger = logging.getLogger()
 logger.setLevel(LOGLEVEL)
 
+def gen_external_id():
+    """
 
+    Returns: A random string in UUID v4 format
+
+
+    """
+    return str(uuid.uuid4())
 
 def get_uptycs_internal_id(url, req_header, account_id):
     # params = {"hideServices": "true", "hideSideQuery": "false", "minimalInfo": "true"}
@@ -151,6 +159,10 @@ def gen_cloudtrail_api_url(domain, domainSuffix, customer_id):
     uptycs_api_url = f"https://{domain}{domainSuffix}/public/api/customers/{customer_id}/cloudTrailBuckets"
     return uptycs_api_url
 
+def get_org_data(url, req_header):
+    status, response = http_get(url, req_header)
+    return response
+
 
 def get_uptycs_internal_id(url, req_header, account_id):
     params = {"hideServices": "true", "hideSideQuery": "false", "minimalInfo": "true"}
@@ -215,6 +227,24 @@ def account_registration_handler(args):
                 print(f'No entry found for AWS account {account_id}')
         except Exception as error:
             print(f'Exception handling delete event {error}')
+    elif args.action == "Check":
+        try:
+            account_id = get_master_account() if not args.masteraccount else args.masteraccount
+            uptycs_account_id = get_uptycs_internal_id(uptycs_api_url, req_header,
+                                                       account_id)
+
+            if uptycs_account_id:
+                print(f'Retrieved Uptycs internal account id  {uptycs_account_id} for AWS account'
+                      f' {account_id}')
+
+            else:
+                print(f'No entry found for AWS account {account_id}')
+
+            org_info = get_org_data(uptycs_api_url, req_header)
+            print(json.dumps(org_info, indent=2))
+
+        except Exception as error:
+            print(f'Exception handling delete event {error}')
 
 
 
@@ -226,7 +256,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Creates a cloudformation template to Integrate Uptycs with this account'
     )
-    parser.add_argument('--action', choices=['Register', 'Delete'], required=True,
+    parser.add_argument('--action', choices=['Register', 'Delete', 'Check'], required=True,
                         help='REQUIRED: The action to perform: Register, or Delete')
     parser.add_argument('--config', required=True,
                         help='REQUIRED: The path to your auth config file downloaded from Uptycs console')
@@ -255,18 +285,7 @@ if __name__ == '__main__':
 
     # Check if --arn argument is provided
 
-    if action == 'Check':
-        print(f"Checking for api credentials file {args.config}")
-        try:
-            with open(args.config) as api_config_file:
-                data = json.load(api_config_file)
-                # write_dict_to_ssm(ssmparam, data)
-        except FileNotFoundError:
-            print("File not found check the location of the apikey file: ", args.config)
-            sys.exit(0)
-
-    else:
-        account_registration_handler(args)
+    account_registration_handler(args)
 
 
 

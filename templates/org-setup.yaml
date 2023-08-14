@@ -21,9 +21,10 @@ Metadata:
         Parameters:
           - PermissionsBoundary
     ParameterLabels:
+      UptycsSecretName:
+        default: The ARN of the secret created by QuickLaunch
       CloudTrailBucket:
         default: Cloudtrail Bucket Name
-
       UptycsAccountId:
         default: The Uptycs Account from which the role is assumed (Only change for
           dev testing)
