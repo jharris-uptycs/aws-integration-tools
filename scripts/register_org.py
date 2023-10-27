@@ -1,15 +1,44 @@
 """
-# Uptycs AWS Organization Registration script
-# The script will Register or delete an AWS organization if the required roles and cloudtrail have
-# been created manually
-#
-# Usage: register_org.py --action Register --config apikey.json --rolename UptycsIntegration
-# --externalid xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx --masteraccount 123456789012
-#
-#
-# Specify master account ID if not running inside Cloudshell in master or not using master account
-# cli profile
-#
+Script for Uptycs-AWS Organization Registration for Security Monitoring
+
+This script is designed to assist in registering an AWS organization with the Uptycs platform
+for security monitoring purposes. The integration is performed through the provided arguments
+which specify details like action type (register, delete, check), authentication configurations,
+external ID, role name, and optional parameters related to the CloudTrail bucket.
+
+The primary functions include:
+- Registering the AWS organization for monitoring on Uptycs.
+- Deleting the AWS organization from Uptycs.
+- Checking the registration status of the AWS organization on Uptycs.
+
+The script takes in mandatory arguments related to action type, authentication configurations,
+external ID, and role name. Additionally, it also accepts optional arguments related to the
+CloudTrail bucket. If any one of the optional CloudTrail parameters is specified, all of them
+must be specified.
+
+Usage:
+    python <script_name>.py --action <action_type> --config <config_path> --externalid <external_id>
+    --rolename <role_name> [--ctaccount <ct_account>] [--ctbucket <ct_bucket>]
+    [--ctregion <ct_region>] [--ctprefix <ct_prefix>] [--masteraccount <master_account>]
+
+Parameters:
+    action: Action to perform (choices: Register, Delete, Check)
+    config: Path to the authentication configuration file from Uptycs
+    externalid: External ID applied to the trust relationship of the role (default: UptycsIntegrationRole)
+    rolename: Name of the IAM role to be created (default: UptycsIntegrationRole)
+    ctaccount: (Optional) Account ID of the CloudTrail bucket
+    ctbucket: (Optional) Name of the CloudTrail bucket
+    ctregion: (Optional) Region of the CloudTrail bucket
+    ctprefix: (Optional) Prefix for the CloudTrail logs
+    masteraccount: (Optional) Master AWS account ID (12 digits)
+
+Requirements:
+    - argparse
+    - sys (for handling exit scenarios)
+
+Note:
+    Ensure the script has appropriate permissions to perform the specified action
+    (register, delete, check) on both AWS and Uptycs platforms.
 """
 
 import argparse
@@ -424,8 +453,7 @@ def org_registration_handler(cli_args: argparse.Namespace):
 
 if __name__ == '__main__':
     """
-    Main function to parse arguments and call Uptycs Web API to update External ID and IAM Role ARN 
-    in AWS CSPM integration
+    Main function 
     """
     parser = argparse.ArgumentParser(
         description='Creates a cloudformation template to Integrate Uptycs with this account'
