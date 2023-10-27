@@ -1,0 +1,181 @@
+#
+# Cloudformation template to create a service managed Stackset for creating an IAM role in each
+# member account in your organization.
+# Options:
+#    S3BucketName:  Change this if you wish to use your own S3bucket to host the template
+#    S3 Prefix:  Change this if you modify the folder structure.
+#    PermissionsBoundary:  Add the policy name if you are required to add a policy to any IAM
+#                          role you create
+#    UptycsRoleName:   Change if you require a different RoleName
+#
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create a custom resource for generating an external ID using Lambda.
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        - E9008
+  AWS::CloudFormation::Interface:
+    ParameterLabels:
+      UptycsRoleName:
+        default: "The name of the Role that Uptycs will assume in your account"
+      PermissionsBoundary:
+        default: "The name of the permissions boundary to apply to IAM roles"
+      S3BucketName:
+        default: "The S3 bucket containing Uptycs Source files"
+      S3KeyPrefix:
+        default: "The S3 bucket prefix for the source files"
+    ParameterGroups:
+      - Label:
+          default: "AWS Related Configuration (Do not change unless instructed to by support)"
+        Parameters:
+          - UptycsRoleName
+      - Label:
+          default: Deployment Related Information
+        Parameters:
+          - PermissionsBoundary
+      - Label:
+          default: "Source file bucket Parameters (Change of self hosting)"
+        Parameters:
+          - S3BucketName
+          - S3KeyPrefix
+Parameters:
+  ## Uptycs API permissions stored in parameter store
+  UptycsRoleName:
+    Description: Custom IAM role.
+    Type: String
+    Default: UptycsIntegrationRole
+  S3BucketName:
+    AllowedPattern: ^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$
+    Type: String
+    Description: Name of the zip file bucket
+    Default: "uptycs-cloud-integrations-test"
+  S3KeyPrefix:
+    Type: String
+    AllowedPattern: ^[0-9a-zA-Z-/]*$
+    ConstraintDescription: 'Uptycs bucket key prefix can include numbers, lowercase 
+        letters, uppercase letters, hyphens (-), and forward slash (/).'
+    Description: 'S3 key prefix for the Uptycs Moonwalk assets. Uptycs Moonwalk key prefix
+        can include numbers, lowercase letters, uppercase letters, hyphens (-), and
+        forward slash (/).'
+    Default: "uptycs-ct-quicklaunch"
+  PermissionsBoundary:
+    Description: 'The name of the permission boundary for all roles created by this template.'
+    Type: String
+    Default: ''
+
+Conditions:
+  HasPermissionsBoundary: !Not [!Equals ['', !Ref PermissionsBoundary]]
+Resources:
+  #
+  # Lambda resources to generate a random string in UUIDv4 format used as the externalId in the IAM
+  # role trust policy
+  #
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:${AWS::Partition}:logs:*:*:*'
+  #
+  # Lambda to generate a random string in UUIDv4 format used as the externalId in the IAM role
+  # trust policy
+  #
+  UptycsLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.9
+      Code:
+        ZipFile: |
+          import uuid
+          import cfnresponse
+          import urllib3
+          import json
+          http = urllib3.PoolManager()
+          SUCCESS = "SUCCESS"
+          FAILED = "FAILED"
+          
+          def gen_external_id() -> str:
+              return str(uuid.uuid4())
+
+          def cfnresponse_send(event, context, response_status, response_data, physical_resourceid=None, noecho=False, reason=None):
+              response_url = event['ResponseURL']
+              response_body = {
+                  'Status': response_status,
+                  'Reason': reason or 'See the details in CloudWatch Log Stream: ' + context.log_stream_name,
+                  'PhysicalResourceId': physical_resourceid or context.log_stream_name,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+                  'NoEcho': noecho,
+                  'Data': response_data
+              }
+              json_response_body = json.dumps(response_body)
+              headers = {
+                  'content-type': '',
+                  'content-length': str(len(json_response_body))
+              }
+              try:
+                  response = http.request('PUT', response_url, body=json_response_body.encode('utf-8'), headers=headers)
+              except Exception as e:
+                  print("send(..) failed executing requests.put(..): " + str(e))
+
+          def lambda_handler(event, context):
+              response_data = {}
+              try:
+                  if event['RequestType'] == "Create":
+                      external_id = gen_external_id()
+                      response_data['external_id'] = external_id
+                      cfnresponse_send(event, context, SUCCESS, response_data)
+                  else:
+                      cfnresponse_send(event, context, SUCCESS, response_data)
+              except Exception as error:
+                  cfnresponse_send(event, context, FAILED, response_data)
+  UptycsGenExternalID:
+    Type: "Custom::UptycsGenExternalID"
+    Properties:
+      ServiceToken: !GetAtt UptycsLambdaFunction.Arn
+  #
+  # Stackset resource  for IAM Role required by Uptycs that should be added to all org accounts
+  #
+  UptycsStackSet:
+    Type: "AWS::CloudFormation::StackSet"
+    Properties:
+      StackSetName: UptycsStackSetName
+      Description: "Uptycs StackSet created from the provided template."
+      TemplateURL: !Sub https://${S3BucketName}.s3.amazonaws.com/${S3KeyPrefix}/templates/s3Bucket/templates/member_acct_template.json"
+      Parameters:
+        - ParameterKey: PermissionsBoundary
+          ParameterValue: !Ref PermissionsBoundary
+        - ParameterKey: UptycsRoleName
+          ParameterValue: !Ref UptycsRoleName
+        - ParameterKey: ExternalId
+          ParameterValue: !GetAtt UptycsGenExternalID.external_id
+      PermissionModel: "SERVICE_MANAGED"
+      Capabilities:
+        - CAPABILITY_NAMED_IAM
+      AutoDeployment:
+        Enabled: false
+Outputs:
+  ExternalIdOutput:
+    Description: "The generated external ID"
+    Value: !GetAtt UptycsGenExternalID.external_id

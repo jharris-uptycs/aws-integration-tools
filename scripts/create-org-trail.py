@@ -204,7 +204,7 @@ def load_bucket_policy(bucket_name, region):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        description='Creates a cloudformation template to Integrate Uptycs with this account'
+        description='Creates a valid org wide trail with required bucket policy and uptycs IAM Role'
     )
     parser.add_argument('--action', choices=['Create', 'Delete'], required=True,
                         help='The action to perform: Create, or Delete')
