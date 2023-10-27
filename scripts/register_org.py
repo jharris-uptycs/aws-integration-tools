@@ -3,8 +3,9 @@
 # The script will Register or delete an AWS organization if the required roles and cloudtrail have
 # been created manually
 #
-# Usage: register_org.py --action xx --config xxx --rolename xxx --externalid xx --ctbucket xx
-# --ctaccount xx --ctregion xx --masteraccount xxx
+# Usage: register_org.py --action Register --config apikey.json --rolename UptycsIntegration
+# --externalid xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx --masteraccount 123456789012
+#
 #
 # Specify master account ID if not running inside Cloudshell in master or not using master account
 # cli profile
@@ -19,6 +20,7 @@ import hmac
 import json
 import logging
 import os
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -241,8 +243,8 @@ def http_get(
         return error.code, json.loads(error.read().decode('utf-8'))
 
 
-def deregister_account \
-                (url: str, header: Dict[str, str], account_id: str) -> Optional[Dict[str, Any]]:
+def deregister_account(
+        url: str, header: Dict[str, str], account_id: str) -> Optional[Dict[str, Any]]:
     """
     Deregister the account using the provided URL and headers.
 
@@ -307,23 +309,6 @@ def gen_cloudaccounts_api_url(domain: str, domain_suffix: str, customer_id: str)
     return uptycs_api_url
 
 
-def gen_cloudtrail_api_url(domain: str, domain_suffix: str, customer_id: str) -> str:
-    """
-    Generate the Uptycs API URL for CloudTrail buckets.
-
-    Args:
-        domain (str): The domain name.
-        domain_suffix (str): The domain suffix.
-        customer_id (str): The customer ID.
-
-    Returns:
-        str: The generated Uptycs API URL for CloudTrail buckets.
-    """
-    uptycs_api_url = \
-        f"https://{domain}{domain_suffix}/public/api/customers/{customer_id}/cloudTrailBuckets"
-    return uptycs_api_url
-
-
 def get_org_data(url: str, req_header: Dict[str, str]) -> Dict[str, Any]:
     """
     Fetch organization data from the provided URL using the given request headers.
@@ -337,34 +322,6 @@ def get_org_data(url: str, req_header: Dict[str, str]) -> Dict[str, Any]:
     """
     _, response = http_get(url, req_header)
     return response
-
-@dataclass
-class CloudTrailInfo:
-    """
-    Represents the essential CloudTrail bucket information.
-
-    Attributes:
-        bucket_name (str): The name of the CloudTrail bucket.
-        account (str): AWS account where the bucket exists.
-        bucket_region (str): Region where the CloudTrail bucket is located.
-        prefix (str): The prefix for the CloudTrail logs in the bucket.
-    """
-
-    def __init__(self, bucket_name: str, account: str, bucket_region: str, prefix: str):
-        """
-        Initializes the CloudTrailInfo with the provided information.
-
-        Args:
-            bucket_name (str): The name of the CloudTrail bucket.
-            account (str): AWS account where the bucket exists.
-            bucket_region (str): Region where the CloudTrail bucket is located.
-            prefix (str): The prefix for the CloudTrail logs in the bucket.
-        """
-        self.bucket_name = bucket_name
-        self.account = account
-        self.bucket_region = bucket_region
-        self.prefix = prefix
-
 
 
 @dataclass
@@ -399,64 +356,70 @@ def org_registration_handler(cli_args: argparse.Namespace):
     """
     Initial lambda handler
     Args:
-        cli_args(str): Uptycs API parameter file
-
+        cli_args: Uptycs API parameter file
     """
+
     api_credentials = UptycsAPICreds(cli_args.config)
     req_header = gen_api_headers(api_credentials.key, api_credentials.secret)
     cloudaccounts_api_url = gen_cloudaccounts_api_url(api_credentials.domain,
                                                       api_credentials.domain_suffix,
                                                       api_credentials.customer_id)
-    cloudaccounts_api_url += "?isAutoEnabled=false"
 
-    if cli_args.action == "Register":
-        try:
+    try:
+        if cli_args.action == "Register":
             req_payload = {
                 "deploymentType": "uptycs",
                 "accessConfig": {},
+                "buckets": [],
                 "organizationId": cli_args.masteraccount,
                 "integrationName": cli_args.rolename,
                 "awsExternalId": cli_args.externalid,
                 "kinesisStream": {}
             }
 
+            if cli_args.ctregion and cli_args.ctaccount and cli_args.ctbucket:
+                req_payload["accessConfig"] = [{
+                    "bucketAccount": cli_args.ctaccount,
+                    "bucketPrefix": cli_args.ctprefix,
+                    "bucketName": cli_args.ctbucket,
+                    "bucketRegion": cli_args.ctregion
+                }]
+
             status, response = http_post(cloudaccounts_api_url, req_header, req_payload)
             if 200 == status:
-                print('Successfully integrated AWS org master account %s', cli_args.masteraccount)
+                print(f'Successfully integrated AWS org master account {cli_args.masteraccount}')
             else:
-                print("Error - %s Message %s", status, response['error']['message'])
-        except Exception as error:  # pylint: disable=W0718
-            print(f"Error during create event {error}")
-            # Handle delete event
-    elif cli_args.action == "Delete":
-        try:
+                print(
+                    f"Error - {status} Message "
+                    f"{response.get('error', {}).get('message', 'Unknown error')}")
+
+        elif cli_args.action == "Delete":
             account_id = cli_args.masteraccount
             uptycs_account_id = get_uptycs_internal_id(cloudaccounts_api_url, req_header)
             if uptycs_account_id:
                 resp = deregister_account(cloudaccounts_api_url, req_header, uptycs_account_id)
                 if resp == 'OK':
-                    print('Successfully deleted AWS account %s', account_id)
+                    print(f'Successfully deleted AWS account {account_id}')
+                else:
+                    print(f"Failed to delete AWS account {account_id}")
             else:
-                print(f'No entry found for AWS account %s', account_id)
-        except Exception as error:  # pylint: disable=W0718
-            print('Exception handling delete event %s', error)
-    elif cli_args.action == "Check":
-        try:
+                print(f'No entry found for AWS account {account_id}')
+
+        elif cli_args.action == "Check":
             account_id = cli_args.masteraccount
             uptycs_account_id = get_uptycs_internal_id(cloudaccounts_api_url, req_header)
-
             if uptycs_account_id:
-                print('Retrieved Uptycs internal account id %s for AWS %s',
-                      uptycs_account_id, account_id)
-
+                print(
+                    f'Retrieved Uptycs internal account id '
+                    f'{uptycs_account_id} for AWS {account_id}')
             else:
-                print('No entry found for AWS account %s', account_id)
+                print(f'No entry found for AWS account {account_id}')
 
             org_info = get_org_data(cloudaccounts_api_url, req_header)
             print(json.dumps(org_info, indent=2))
 
-        except Exception as error:  # pylint: disable=W0718
-            print('Exception handling delete event %s', error)
+    except Exception as error:
+        print(f"Exception handling {cli_args.action} event: {error}")
 
 
 if __name__ == '__main__':
@@ -467,30 +430,46 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Creates a cloudformation template to Integrate Uptycs with this account'
     )
-    parser.add_argument('--action', choices=['Register', 'Delete', 'Check'], required=True,
-                        help='REQUIRED: The action to perform: Register, or Delete')
-    parser.add_argument('--config', required=True,
-                        help='REQUIRED: The path to your auth config file downloaded from Uptycs '
-                             'console')
-    parser.add_argument('--externalid', required=True,
-                        help='The externalid applied to the trust relationship of the role',
-                        default='UptycsIntegrationRole')
-    parser.add_argument('--rolename', required=True,
-                        help='REQUIRED: The name of the IAM role created.',
-                        default='UptycsIntegrationRole')
-    parser.add_argument('--ctaccount', required=True,
-                        help='REQUIRED: The AccountId of the CloudTrail bucket')
-    parser.add_argument('--ctbucket', required=True,
-                        help='REQUIRED: The Name of the CloudTrail bucket')
-    parser.add_argument('--ctregion', required=True,
-                        help='REQUIRED: The Name of the CloudTrail bucket region')
-    parser.add_argument('--ctprefix',
-                        help='OPTIONAL: The Name of the CloudTrail log prefix')
-    parser.add_argument('--masteraccount',
-                        help='OPTIONAL: The Master account ID (12 digits)')
 
-    # Parse the arguments
+    required_args = parser.add_argument_group('required arguments')
+    optional_args = parser.add_argument_group('optional arguments')
+
+
+    required_args.add_argument('--action', choices=['Register', 'Delete', 'Check'], required=True,
+                               help='The action to perform: Register, or Delete')
+    required_args.add_argument('--config', required=True,
+                               help='The path to your auth config file downloaded from Uptycs '
+                                    'console')
+    required_args.add_argument('--externalid', required=True,
+                               help='The externalid applied to the trust relationship of the role',
+                               default='UptycsIntegrationRole')
+    required_args.add_argument('--rolename', required=True,
+                               help='The name of the IAM role created.',
+                               default='UptycsIntegrationRole')
+
+    optional_args.add_argument('--ctaccount',
+                               help='The AccountId of the CloudTrail bucket')
+    optional_args.add_argument('--ctbucket',
+                               help='The Name of the CloudTrail bucket')
+    optional_args.add_argument('--ctregion',
+                               help='The Name of the CloudTrail bucket region')
+    optional_args.add_argument('--ctprefix',
+                               help='The Name of the CloudTrail log prefix')
+    optional_args.add_argument('--masteraccount',
+                               help='The Master account ID (12 digits)')
+
+    # Parse the arguments first
     args = parser.parse_args()
+
+    # List containing optional arguments' values
+    optional_params = [args.ctaccount, args.ctbucket, args.ctregion, args.ctprefix,
+                       args.masteraccount]
+
+    specified_params = [param for param in optional_params if param is not None]
+
+    if 0 < len(specified_params) < len(optional_params):
+        print("Error: If one optional CloudTrail parameter is specified, all must be specified.")
+        sys.exit(1)
 
     action = args.action
 
