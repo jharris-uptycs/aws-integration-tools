@@ -40,7 +40,6 @@ Metadata:
           - S3BucketName
           - S3KeyPrefix
 Parameters:
-  ## Uptycs API permissions stored in parameter store
   UptycsRoleName:
     Description: Custom IAM role.
     Type: String
