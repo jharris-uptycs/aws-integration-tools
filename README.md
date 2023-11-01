@@ -23,7 +23,7 @@ misconfigured resources that pose a security risk and for suspicious activity.
 Upytcs will leverage an IAM role in the account in order to gather information via CloudTrail 
 and the AWS API.
 
-An example of the IAM role created is included [here](./templates/org-member-acct-iam-role.json).
+An example of the IAM role created is included [here](./templates/org-member-acct-iam-role.yaml).
 
 > NOTE:  If your cloudtrail logs are encrypted using SSE-KMS encryption the role will also 
 > require access to the KMS key used to encrypt the logs. 
@@ -65,7 +65,7 @@ that it is monitoring
 ## Standalone Account
 
 For single AWS accounts Uptycs require an IAM role that grants read only access to the services 
-to be monitored and to cloudtrail logs in a S3 bucket in the **same** account. An example policy can be found [here](./templates/org-member-acct-iam-role.json)
+to be monitored and to cloudtrail logs in a S3 bucket in the **same** account. An example policy can be found [here](./templates/org-member-acct-iam-role.yaml)
 
 
 <img src='./images/aws-single-acct.png' width='600'>
@@ -100,7 +100,7 @@ S3 bucket containing the cloudtrail logs. An example policy can be found [here](
 ### Member Accounts
 
 Each member requires an IAM role the grants access to monitored AWS resources. An example 
-policy can be found [here](./templates/org-member-acct-iam-role.json)
+policy can be found [here](./templates/org-member-acct-iam-role.yaml)
 
 
 

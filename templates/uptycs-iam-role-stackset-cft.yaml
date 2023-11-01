@@ -161,6 +161,7 @@ Resources:
     Properties:
       StackSetName: UptycsStackSetName
       Description: "Uptycs StackSet created from the provided template."
+      
       TemplateURL: !Sub https://${S3BucketName}.s3.amazonaws.com/${S3KeyPrefix}/templates/s3Bucket/templates/member_acct_template.json"
       Parameters:
         - ParameterKey: PermissionsBoundary
@@ -178,3 +179,6 @@ Outputs:
   ExternalIdOutput:
     Description: "The generated external ID"
     Value: !GetAtt UptycsGenExternalID.external_id
+  TemplateURLOutput:
+    Description: "The generated external ID"
+    Value: !Sub https://${S3BucketName}.s3.amazonaws.com/${S3KeyPrefix}/templates/s3Bucket/templates/member_acct_template.json"
