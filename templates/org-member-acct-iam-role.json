@@ -1,0 +1,195 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Metadata": {
+    "cfn-lint": {
+      "config": {
+        "ignore_checks": [
+          "E9008"
+        ]
+      }
+    },
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [
+        {
+          "Label": {
+            "default": "Uptycs Role Parameters"
+          },
+          "Parameters": [
+            "ExternalId",
+            "UptycsRoleName",
+            "UptycsAccountId"
+          ]
+        },
+        {
+          "Label": {
+            "default": "Permissions Boundary Info"
+          },
+          "Parameters": [
+            "PermissionsBoundary"
+          ]
+        }
+      ],
+      "ParameterLabels": {
+        "UptycsAccountId": {
+          "default": "The Uptycs Account from which the role is assumed (Only change for dev testing)"
+        },
+        "UptycsRoleName": {
+          "default": "The Uptycs RoleName that will assume the role (Only change for dev testing)"
+        },
+        "ExternalId": {
+          "default": "The ExternalId used by Uptycs to Assume this role"
+        },
+        "PermissionsBoundary": {
+          "default": "The name of the permisssions boundary to apply to IAM roles"
+        }
+      }
+    }
+  },
+  "Parameters": {
+    "UptycsAccountId": {
+      "Description": "Aws account id of Uptycs",
+      "Type": "String",
+      "Default": "031552911331"
+    },
+    "ExternalId": {
+      "Description": "ExternalId to be used for API authentication.",
+      "Type": "String"
+    },
+    "UptycsRoleName": {
+      "Type": "String",
+      "Description": "Name for Uptycs CSPM Reader Role",
+      "Default": "UptycsIntegrationRole1"
+    },
+    "PermissionsBoundary": {
+      "Type": "String",
+      "Default": ""
+    }
+  },
+  "Conditions": {
+    "PermissionsBoundary": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "PermissionsBoundary"
+            },
+            ""
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "UptycsIntegrationRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Ref": "UptycsRoleName"
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:aws:iam::${UptycsAccountId}:user/AWS-API-User-PROD"
+                }
+              },
+              "Condition": {
+                "StringEquals": {
+                  "sts:ExternalId": {
+                    "Ref": "ExternalId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess"
+          },
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/SecurityAudit"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "UptycsReadOnlyPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:GET",
+                    "codebuild:ListProjects",
+                    "codebuild:BatchGetProjects",
+                    "codecommit:GetBranch",
+                    "codecommit:GetCommit",
+                    "codecommit:GetRepository",
+                    "codepipeline:GetPipeline",
+                    "codepipeline:ListTagsForResource",
+                    "ds:ListTagsForResource",
+                    "ec2:DescribeAccountAttributes",
+                    "ec2:GetEbsEncryptionByDefault",
+                    "ec2:SearchTransitGatewayRoutes",
+                    "ec2:GetTransitGatewayMulticastDomainAssociations",
+                    "eks:DescribeAddon",
+                    "eks:DescribeCluster",
+                    "eks:DescribeFargateProfile",
+                    "eks:DescribeIdentityProviderConfig",
+                    "eks:DescribeNodegroup",
+                    "eks:DescribeUpdate",
+                    "eks:ListAddons",
+                    "eks:ListClusters",
+                    "eks:ListFargateProfiles",
+                    "eks:ListIdentityProviderConfigs",
+                    "eks:ListNodegroups",
+                    "eks:ListTagsForResource",
+                    "eks:ListUpdates",
+                    "elasticache:ListTagsForResource",
+                    "es:ListTags",
+                    "glacier:DescribeJob",
+                    "glacier:DescribeVault",
+                    "glacier:GetDataRetrievalPolicy",
+                    "glacier:GetJobOutput",
+                    "glacier:GetVaultAccessPolicy",
+                    "glacier:GetVaultLock",
+                    "glacier:GetVaultNotifications",
+                    "glacier:ListJobs",
+                    "glacier:ListTagsForVault",
+                    "glacier:ListVaults",
+                    "kinesis:DescribeStream",
+                    "logs:FilterLogEvents",
+                    "ram:GetResourceShares",
+                    "ram:ListResources",
+                    "s3:GetIntelligentTieringConfiguration",
+                    "secretsmanager:DescribeSecret",
+                    "servicecatalog:DescribePortfolio",
+                    "servicecatalog:DescribeProductAsAdmin",
+                    "servicecatalog:DescribeProvisioningArtifact",
+                    "servicecatalog:DescribeServiceAction",
+                    "servicecatalog:SearchProductsAsAdmin",
+                    "sns:GetSubscriptionAttributes",
+                    "sns:GetTopicAttributes",
+                    "sns:ListSubscriptionsByTopic",
+                    "sns:ListTagsForResource",
+                    "sns:ListTopics",
+                    "sqs:GetQueueAttributes",
+                    "sqs:ListQueueTags",
+                    "sqs:ListQueues",
+                    "ssm:ListCommandInvocations"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
