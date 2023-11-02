@@ -322,7 +322,7 @@ def get_master_account() -> Optional[str]:
 
 
 def gen_cloudaccounts_api_url(domain: str, domain_suffix: str,
-                              customer_id: str, enable_auto: bool = False) -> str:
+                              customer_id: str, add_interation_flag: bool = True) -> str:
     """
     Generate the Uptycs API URL for cloud accounts.
 
@@ -330,7 +330,7 @@ def gen_cloudaccounts_api_url(domain: str, domain_suffix: str,
         domain (str): The domain name.
         domain_suffix (str): The domain suffix.
         customer_id (str): The customer ID.
-        enable_auto (bool): Enable autointgration
+        add_interation_flag (bool): Enable autointgration
 
     Returns:
         str: The generated Uptycs API URL for cloud accounts.
@@ -342,7 +342,7 @@ def gen_cloudaccounts_api_url(domain: str, domain_suffix: str,
     #
     # Disable autointegration
     #
-    if not enable_auto:
+    if add_interation_flag:
         uptycs_api_url += "?isAutoEnabled=false"
     return uptycs_api_url
 
@@ -399,12 +399,12 @@ def org_registration_handler(cli_args: argparse.Namespace):
 
     api_credentials = UptycsAPICreds(cli_args.config)
     req_header = gen_api_headers(api_credentials.key, api_credentials.secret)
-    cloudaccounts_api_url = gen_cloudaccounts_api_url(api_credentials.domain,
-                                                      api_credentials.domain_suffix,
-                                                      api_credentials.customer_id)
 
     try:
         if cli_args.action == "Register":
+            cloudaccounts_api_url = gen_cloudaccounts_api_url(api_credentials.domain,
+                                                              api_credentials.domain_suffix,
+                                                              api_credentials.customer_id)
             req_payload = {
                 "deploymentType": "uptycs",
                 "accessConfig": {},
@@ -432,6 +432,11 @@ def org_registration_handler(cli_args: argparse.Namespace):
                     f"{response.get('error', {}).get('message', 'Unknown error')}")
 
         elif cli_args.action == "Delete":
+            # Deletion does not require inclusion of auto integration flag
+            cloudaccounts_api_url = gen_cloudaccounts_api_url(api_credentials.domain,
+                                                              api_credentials.domain_suffix,
+                                                              api_credentials.customer_id,
+                                                              add_interation_flag=False)
             account_id = cli_args.masteraccount
             uptycs_account_id = get_uptycs_internal_id(cloudaccounts_api_url, req_header)
             if uptycs_account_id:
@@ -444,6 +449,11 @@ def org_registration_handler(cli_args: argparse.Namespace):
                 print(f'No entry found for AWS account {account_id}')
 
         elif cli_args.action == "Check":
+            # Get does not require inclusion of auto integration flag
+            cloudaccounts_api_url = gen_cloudaccounts_api_url(api_credentials.domain,
+                                                              api_credentials.domain_suffix,
+                                                              api_credentials.customer_id,
+                                                              add_interation_flag=False)
             account_id = cli_args.masteraccount
             uptycs_account_id = get_uptycs_internal_id(cloudaccounts_api_url, req_header)
             if uptycs_account_id:
@@ -470,7 +480,6 @@ if __name__ == '__main__':
 
     required_args = parser.add_argument_group('required arguments')
     optional_args = parser.add_argument_group('optional arguments')
-
 
     required_args.add_argument('--action', choices=['Register', 'Delete', 'Check'], required=True,
                                help='The action to perform: Register, or Delete')
