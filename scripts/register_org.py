@@ -18,8 +18,9 @@ must be specified.
 
 Usage:
     python <script_name>.py --action <action_type> --config <config_path> --externalid <external_id>
-    --rolename <role_name> [--ctaccount <ct_account>] [--ctbucket <ct_bucket>]
-    [--ctregion <ct_region>] [--ctprefix <ct_prefix>] [--masteraccount <master_account>]
+    --rolename <role_name> --masteraccount <master_account>
+    [--ctaccount <ct_account>] [--ctbucket <ct_bucket>]
+    [--ctregion <ct_region>] [--ctprefix <ct_prefix>]
 
 Parameters:
     action: Action to perform (choices: Register, Delete, Check)
@@ -320,7 +321,8 @@ def get_master_account() -> Optional[str]:
         return None
 
 
-def gen_cloudaccounts_api_url(domain: str, domain_suffix: str, customer_id: str) -> str:
+def gen_cloudaccounts_api_url(domain: str, domain_suffix: str,
+                              customer_id: str, enable_auto: bool = False) -> str:
     """
     Generate the Uptycs API URL for cloud accounts.
 
@@ -328,13 +330,20 @@ def gen_cloudaccounts_api_url(domain: str, domain_suffix: str, customer_id: str)
         domain (str): The domain name.
         domain_suffix (str): The domain suffix.
         customer_id (str): The customer ID.
+        enable_auto (bool): Enable autointgration
 
     Returns:
         str: The generated Uptycs API URL for cloud accounts.
+
     """
     uptycs_api_url = \
         f"https://{domain}{domain_suffix}/public/api/customers/{customer_id}" \
         f"/cloud/aws/organizations"
+    #
+    # Disable autointegration
+    #
+    if not enable_auto:
+        uptycs_api_url += "?isAutoEnabled=false"
     return uptycs_api_url
 
 
@@ -490,8 +499,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # List containing optional arguments' values
-    optional_params = [args.ctaccount, args.ctbucket, args.ctregion, args.ctprefix,
-                       args.masteraccount]
+    optional_params = [args.ctaccount, args.ctbucket, args.ctregion, args.ctprefix]
 
     specified_params = [param for param in optional_params if param is not None]
 
