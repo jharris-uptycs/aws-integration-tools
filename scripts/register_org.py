@@ -416,7 +416,7 @@ def org_registration_handler(cli_args: argparse.Namespace):
             }
 
             if cli_args.ctregion and cli_args.ctaccount and cli_args.ctbucket:
-                req_payload["accessConfig"] = [{
+                req_payload["buckets"] = [{
                     "bucketAccount": cli_args.ctaccount,
                     "bucketPrefix": cli_args.ctprefix,
                     "bucketName": cli_args.ctbucket,
