@@ -1,3 +1,33 @@
+# AWS CloudFormation Template: Uptycs Service Role and StackSet
+#
+# Description:
+# This template is designed to set up necessary roles and permissions for Uptycs
+# security management across an AWS Organization. It performs two primary functions:
+#
+# 1. Creates an IAM role named 'UptycsIAMRole' within the master account. This role
+#    is tailored for the Uptycs service, allowing it to perform actions and access
+#    resources as defined by the attached policies.
+#
+# 2. Establishes a service-managed StackSet that contains the defined Uptycs IAM role.
+#    This StackSet is configured to deploy automatically to all existing and future
+#    member accounts within the organization, ensuring that Uptycs has the necessary
+#    permissions across the entire AWS environment.
+#
+# Auto-Deployment:
+# To enable automatic deployment across the organization, the StackSet is configured
+# with the AutoDeployment property. This ensures that when new accounts are added to
+# the organization, they will automatically receive the necessary configurations without
+# manual intervention.
+#
+# Usage:
+# Update the template with the specific permissions required by Uptycs in the IAM role
+# policy definition. Before deploying this template, ensure that AWS CloudFormation
+# service-linked roles and AWS Organizations are properly set up to allow for service-managed
+# StackSets.
+#
+# Note: This template assumes that the AWS Organization and Service-Linked Role for
+# CloudFormation are already in place.
+
 AWSTemplateFormatVersion: '2010-09-09'
 Metadata:
   cfn-lint:
@@ -15,16 +45,21 @@ Metadata:
       - Label:
           default: CloudTrail Related Parameters
         Parameters:
-          - CloudTrailBucket
+          - KMSKeyArn
+          - CloudTrailBucketName
       - Label:
           default: Permissions Boundary Info
         Parameters:
           - PermissionsBoundary
+
     ParameterLabels:
       UptycsSecretName:
         default: The ARN of the secret created by QuickLaunch
       CloudTrailBucket:
-        default: Cloudtrail Bucket Name
+        default: Only specify this if your Cloudtrail bucket is in THIS account
+      KMSKeyArn:
+        default: Add the SSE-KMS Arn if using KMS encryption.  Leave blank if using
+          SSE-S3
       UptycsAccountId:
         default: The Uptycs Account from which the role is assumed (Only change for
           dev testing)
@@ -35,11 +70,14 @@ Metadata:
         default: The ExternalId used by Uptycs to Assume this role
       PermissionsBoundary:
         default: The name of the permisssions boundary to apply to IAM roles
-
-
 Parameters:
   CloudTrailBucket:
     Description: "Example aws-cloudtrail-logs-<accountId>-uptycs-cnap"
+    Default: ''
+    Type: String
+  KMSKeyArn:
+    Description: SSE-KMS Arn
+    Default: ''
     Type: String
   UptycsAccountId:
     Description: Aws account id of Uptycs
@@ -58,11 +96,9 @@ Parameters:
     Default: ''
 
 Conditions:
-  PermissionsBoundary: !Not
-    - !Equals
-      - !Ref 'PermissionsBoundary'
-      - ''
-
+  PermissionsBoundarySpecified: !Not [ !Equals [ !Ref PermissionsBoundary, "" ] ]
+  CloudTrailBucketSpecified: !Not [!Equals [!Ref CloudTrailBucket, ""]]
+  KMSDecryptKey: !Not [!Equals [!Ref KMSKeyArn, ""]]
 Resources:
   UptycsIntegrationRole:
     Type: AWS::IAM::Role
@@ -81,22 +117,38 @@ Resources:
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess'
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/SecurityAudit'
+  UptycsKMSDecryptPolicy:
+    Type: AWS::IAM::Policy
+    Condition: KMSDecryptKey
+    Properties:
+      PolicyName: DecryptPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DecryptLogFiles
+            Action:
+              - kms:Decrypt
+            Effect: Allow
+            Resource: !Ref 'KMSKeyArn'
+      Roles:
+        - !Ref 'UptycsIntegrationRole'
   UptycsAccessPolicy:
-        Type: AWS::IAM::Policy
-        Properties:
-          PolicyName: UptycsAccessPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:ListBucket
-                Resource:
-                  - !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailBucket}/*'
-                  - !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailBucket}'
-          Roles:
-            - !Ref 'UptycsIntegrationRole'
+    Type: AWS::IAM::Policy
+    Condition: CloudTrailBucketSpecified
+    Properties:
+      PolicyName: UptycsAccessPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailBucket}/*'
+              - !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailBucket}'
+      Roles:
+        - !Ref 'UptycsIntegrationRole'
   UptycsMemberAcctStackset:
     Type: AWS::CloudFormation::StackSet
     Properties:
