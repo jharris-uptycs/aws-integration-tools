@@ -110,7 +110,7 @@ Resources:
           - Action: sts:AssumeRole
             Effect: Allow
             Principal:
-              AWS: !Sub 'arn:aws:iam::${UptycsAccountId}:user/AWS-API-User-PROD'
+              AWS: !Ref UptycsAccountId
             Condition:
               StringEquals:
                 sts:ExternalId: !Ref 'ExternalId'
