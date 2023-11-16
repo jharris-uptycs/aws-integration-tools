@@ -25,7 +25,6 @@
             "default": "Log Archive Parameters"
           },
           "Parameters": [
-            "KMSKeyArn",
             "CloudTrailBucketName"
           ]
         },
@@ -53,9 +52,6 @@
         },
         "CloudTrailBucketName": {
           "default": "The cloudtrail bucket name normally aws-controltower-xxxx"
-        },
-        "KMSKeyArn": {
-          "default": "Add the SSE-KMS Arn if using KMS encryption.  Leave blank if using SSE-S3"
         }
       }
     }
@@ -73,16 +69,11 @@
     "UptycsRoleName": {
       "Type": "String",
       "Description": "Name for Uptycs CSPM Reader Role",
-      "Default": "UptycsIntegrationRole1"
+      "Default": "UptycsIntegrationRole"
     },
     "CloudTrailBucketName": {
       "Type": "String",
       "Description": "Name of your cloudtrail bucket"
-    },
-    "KMSKeyArn": {
-      "Description": "SSE-KMS Arn .",
-      "Default": "",
-      "Type": "String"
     },
     "PermissionsBoundary": {
       "Type": "String",
@@ -96,18 +87,6 @@
           "Fn::Equals": [
             {
               "Ref": "PermissionsBoundary"
-            },
-            ""
-          ]
-        }
-      ]
-    },
-    "KMSDecryptKey": {
-      "Fn::Not": [
-        {
-          "Fn::Equals": [
-            {
-              "Ref": "KMSKeyArn"
             },
             ""
           ]
@@ -129,9 +108,9 @@
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "AWS": {
-                  "Fn::Sub": "arn:aws:iam::${UptycsAccountId}:user/AWS-API-User-PROD"
-                }
+                  "AWS": {
+                      "Ref": "UptycsAccountId"
+                  }
               },
               "Condition": {
                 "StringEquals": {
@@ -164,7 +143,7 @@
               "Effect": "Allow",
               "Action": [
                 "s3:GetObject",
-                "s3:ListBucket"
+				"s3:ListBucket"
               ],
               "Resource": [
                 {
@@ -174,33 +153,6 @@
                   "Fn::Sub": "arn:${AWS::Partition}:s3:::${CloudTrailBucketName}"
                 }
               ]
-            }
-          ]
-        },
-        "Roles": [
-          {
-            "Ref": "UptycsIntegrationRole"
-          }
-        ]
-      }
-    },
-    "UptycsKMSDecryptPolicy": {
-      "Type": "AWS::IAM::Policy",
-      "Condition": "KMSDecryptKey",
-      "Properties": {
-        "PolicyName": "DecryptPolicy",
-        "PolicyDocument": {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Sid": "DecryptLogFiles",
-              "Action": [
-                "kms:Decrypt"
-              ],
-              "Effect": "Allow",
-              "Resource": {
-                "Ref": "KMSKeyArn"
-              }
             }
           ]
         },

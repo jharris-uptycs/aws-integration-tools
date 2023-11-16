@@ -93,9 +93,9 @@
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "AWS": {
-                  "Fn::Sub": "arn:aws:iam::${UptycsAccountId}:user/AWS-API-User-PROD"
-                }
+                  "AWS": {
+                      "Ref": "UptycsAccountId"
+                  }
               },
               "Condition": {
                 "StringEquals": {
